@@ -15,8 +15,8 @@ st.set_page_config(
 ZONES = {
     1: {"label": "Front Left", "emoji": "↖️"},
     2: {"label": "Front Right", "emoji": "↗️"},
-    3: {"label": "Side Left", "emoji": "⬅️"},
-    4: {"label": "Side Right", "emoji": "➡️"},
+    3: {"label": "Middle Left", "emoji": "⬅️"},
+    4: {"label": "Middle Right", "emoji": "➡️"},
     5: {"label": "Rear Left", "emoji": "↙️"},
     6: {"label": "Rear Right", "emoji": "↘️"},
 }
@@ -24,30 +24,31 @@ ZONES = {
 MODE_ZONES = {
     "Random six corners": [1, 2, 3, 4, 5, 6],
     "Front court only": [1, 2],
-    "Side only": [3, 4],
+    "Middle court only": [3, 4],
     "Rear court only": [5, 6],
 }
+
 
 # -----------------------------
 # Session state
 # -----------------------------
-if "running" not in st.session_state:
-    st.session_state.running = False
-if "current_zone" not in st.session_state:
-    st.session_state.current_zone = None
-if "rep_count" not in st.session_state:
-    st.session_state.rep_count = 0
-if "history" not in st.session_state:
-    st.session_state.history = []
-if "start_time" not in st.session_state:
-    st.session_state.start_time = None
+defaults = {
+    "running": False,
+    "current_zone": None,
+    "rep_count": 0,
+    "history": [],
+    "start_time": None,
+}
+
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
 # -----------------------------
 # Helpers
 # -----------------------------
 def speak_number(number: int):
-    """Speak the zone number in the browser."""
     components.html(
         f"""
         <script>
@@ -62,152 +63,171 @@ def speak_number(number: int):
     )
 
 
-def court_html(active_zone=None, show_labels=True):
-    """Return a simple badminton court graphic with six numbered zones."""
-    def zone_style(zone):
-        if zone == active_zone:
-            return "background:#ffeaa7; border:4px solid #222; transform:scale(1.03);"
-        return "background:#f8f9fa; border:2px solid #777;"
-
-    def zone_block(zone):
+def badminton_court_html(active_zone=None, show_labels=True):
+    def cell(zone):
+        is_active = zone == active_zone
+        bg = "#fff3b0" if is_active else "#f7fbff"
+        border = "4px solid #111" if is_active else "2px solid #1f2937"
+        shadow = "0 0 18px rgba(0,0,0,0.28)" if is_active else "none"
+        scale = "scale(1.03)" if is_active else "scale(1)"
         label = ZONES[zone]["label"] if show_labels else ""
         return f"""
-        <div class="zone" style="{zone_style(zone)}">
+        <div class="zone-cell" style="background:{bg}; border:{border}; box-shadow:{shadow}; transform:{scale};">
             <div class="zone-number">{zone}</div>
-            <div class="zone-label">{label}</div>
+            <div class="zone-name">{label}</div>
         </div>
         """
 
     return f"""
     <style>
-        .court {{
-            max-width: 520px;
-            margin: 0 auto;
-            border: 5px solid #222;
-            border-radius: 12px;
-            background: #ffffff;
-            padding: 10px;
+        .court-wrapper {{
+            width: 100%;
+            max-width: 430px;
+            margin: 0 auto 14px auto;
+            padding: 14px;
+            border-radius: 18px;
+            background: #e8f5e9;
+            border: 4px solid #111827;
+            font-family: Arial, sans-serif;
         }}
-        .court-grid {{
+        .court-title {{
+            text-align: center;
+            font-weight: 800;
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: #111827;
+        }}
+        .badminton-court {{
+            position: relative;
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: repeat(3, 120px);
-            gap: 8px;
+            gap: 0;
+            border: 5px solid #111827;
+            background: white;
         }}
-        .zone {{
+        .badminton-court:before {{
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 33.33%;
+            border-top: 5px solid #111827;
+            z-index: 3;
+        }}
+        .badminton-court:after {{
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 66.66%;
+            border-top: 5px solid #111827;
+            z-index: 3;
+        }}
+        .center-line {{
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            border-left: 5px solid #111827;
+            z-index: 3;
+        }}
+        .net-line {{
+            text-align: center;
+            font-weight: 800;
+            font-size: 13px;
+            color: #111827;
+            margin-bottom: 6px;
+        }}
+        .zone-cell {{
             display: flex;
             flex-direction: column;
-            align-items: center;
             justify-content: center;
-            border-radius: 10px;
-            transition: all 0.2s ease-in-out;
+            align-items: center;
+            transition: all 0.2s ease;
+            z-index: 1;
+            margin: 4px;
+            border-radius: 8px;
         }}
         .zone-number {{
-            font-size: 54px;
-            font-weight: 800;
+            font-size: 58px;
+            font-weight: 900;
             line-height: 1;
+            color: #111827;
         }}
-        .zone-label {{
-            font-size: 16px;
-            color: #555;
-            margin-top: 8px;
-        }}
-        .net {{
-            text-align: center;
+        .zone-name {{
             font-size: 14px;
-            font-weight: bold;
-            color: #444;
-            margin: 8px 0;
+            color: #374151;
+            margin-top: 8px;
+            font-weight: 600;
         }}
-        .base {{
+        .base-note {{
             text-align: center;
             margin-top: 10px;
-            font-size: 14px;
-            color: #555;
+            font-size: 13px;
+            color: #111827;
+            font-weight: 600;
         }}
     </style>
 
-    <div class="court">
-        <div class="net">NET / FRONT COURT</div>
-        <div class="court-grid">
-            {zone_block(1)}
-            {zone_block(2)}
-            {zone_block(3)}
-            {zone_block(4)}
-            {zone_block(5)}
-            {zone_block(6)}
+    <div class="court-wrapper">
+        <div class="court-title">Badminton Court Zone Map</div>
+        <div class="net-line">NET / FRONT COURT</div>
+        <div class="badminton-court">
+            <div class="center-line"></div>
+            {cell(1)}
+            {cell(2)}
+            {cell(3)}
+            {cell(4)}
+            {cell(5)}
+            {cell(6)}
         </div>
-        <div class="base">Start from base → move to called number → recover to base</div>
+        <div class="base-note">Base position is around the middle. Move to the called number, then recover.</div>
     </div>
     """
 
 
-def display_call(zone, display_mode):
+def call_display_html(zone, display_mode):
     label = ZONES[zone]["label"]
     emoji = ZONES[zone]["emoji"]
 
     if display_mode == "Number only":
-        return f"""
-        <div style="text-align:center; padding:25px;">
-            <div style="font-size:100px; font-weight:900;">{zone}</div>
-            <div style="font-size:20px; color:gray;">Move to zone {zone}</div>
-        </div>
-        """
+        main = f"<div style='font-size:112px; font-weight:900;'>{zone}</div><div style='font-size:20px;color:#6b7280;'>Zone {zone}</div>"
     elif display_mode == "Direction only":
-        return f"""
-        <div style="text-align:center; padding:25px;">
-            <div style="font-size:80px;">{emoji}</div>
-            <div style="font-size:42px; font-weight:bold;">{label}</div>
-        </div>
-        """
+        main = f"<div style='font-size:76px;'>{emoji}</div><div style='font-size:38px;font-weight:800;'>{label}</div>"
     else:
-        return f"""
-        <div style="text-align:center; padding:25px;">
-            <div style="font-size:95px; font-weight:900;">{zone}</div>
-            <div style="font-size:36px; font-weight:bold;">{label}</div>
-            <div style="font-size:54px;">{emoji}</div>
-        </div>
-        """
+        main = f"<div style='font-size:104px; font-weight:900;'>{zone}</div><div style='font-size:30px;font-weight:800;'>{label}</div><div style='font-size:44px;'>{emoji}</div>"
+
+    return f"""
+    <div style="text-align:center; padding:18px; border:2px solid #e5e7eb; border-radius:18px; margin-top:10px;">
+        {main}
+    </div>
+    """
 
 
 # -----------------------------
 # UI
 # -----------------------------
 st.title("🏸 Badminton Footwork Lab")
-st.caption("Six-corner badminton footwork caller with numbered court zones")
+st.caption("Six-corner footwork caller with numbered badminton court zones")
 
 st.markdown("---")
 
 col1, col2 = st.columns(2)
-
 with col1:
-    interval = st.slider(
-        "Seconds between calls",
-        min_value=1.0,
-        max_value=8.0,
-        value=3.0,
-        step=0.5
-    )
-
+    interval = st.slider("Seconds between calls", 1.0, 8.0, 3.0, 0.5)
 with col2:
-    total_time = st.slider(
-        "Session length / minutes",
-        min_value=1,
-        max_value=20,
-        value=3,
-        step=1
-    )
+    total_time = st.slider("Session length / minutes", 1, 20, 3, 1)
 
 mode = st.radio(
     "Training mode",
-    ["Random six corners", "Front court only", "Side only", "Rear court only"],
-    horizontal=False
+    ["Random six corners", "Front court only", "Middle court only", "Rear court only"],
 )
 
 display_mode = st.radio(
     "Display style",
     ["Number + direction", "Number only", "Direction only"],
-    horizontal=True
+    horizontal=True,
 )
 
 show_court_labels = st.checkbox("Show direction labels inside court", value=True)
@@ -223,15 +243,12 @@ progress_bar = st.progress(0)
 timer_text = st.empty()
 rep_text = st.empty()
 
-button_col1, button_col2, button_col3 = st.columns(3)
-
-with button_col1:
+b1, b2, b3 = st.columns(3)
+with b1:
     start_button = st.button("▶️ Start", use_container_width=True)
-
-with button_col2:
+with b2:
     stop_button = st.button("⏹️ Stop", use_container_width=True)
-
-with button_col3:
+with b3:
     reset_button = st.button("🔄 Reset", use_container_width=True)
 
 if reset_button:
@@ -253,31 +270,32 @@ if start_button:
     st.session_state.start_time = time.time()
 
 # -----------------------------
-# Main app display
+# Main loop
 # -----------------------------
 if st.session_state.running:
     total_seconds = total_time * 60
-    elapsed = 0
 
-    while st.session_state.running and elapsed < total_seconds:
+    while st.session_state.running:
+        elapsed = time.time() - st.session_state.start_time
+        if elapsed >= total_seconds:
+            break
+
         zone = random.choice(active_zones)
-
         st.session_state.current_zone = zone
         st.session_state.rep_count += 1
         st.session_state.history.append(zone)
 
-        elapsed = time.time() - st.session_state.start_time
         remaining = max(0, int(total_seconds - elapsed))
         progress = min(1.0, elapsed / total_seconds)
 
         court_placeholder.markdown(
-            court_html(active_zone=zone, show_labels=show_court_labels),
-            unsafe_allow_html=True
+            badminton_court_html(active_zone=zone, show_labels=show_court_labels),
+            unsafe_allow_html=True,
         )
 
         call_placeholder.markdown(
-            display_call(zone, display_mode),
-            unsafe_allow_html=True
+            call_display_html(zone, display_mode),
+            unsafe_allow_html=True,
         )
 
         if enable_voice:
@@ -290,27 +308,28 @@ if st.session_state.running:
         time.sleep(interval)
 
     st.session_state.running = False
+    progress_bar.progress(1.0)
     st.success("Session complete! Nice work.")
 
 else:
     court_placeholder.markdown(
-        court_html(active_zone=None, show_labels=show_court_labels),
-        unsafe_allow_html=True
+        badminton_court_html(active_zone=None, show_labels=show_court_labels),
+        unsafe_allow_html=True,
     )
     call_placeholder.markdown(
         """
-        <div style="text-align:center; padding:25px;">
-            <div style="font-size:70px;">🏸</div>
-            <div style="font-size:36px; font-weight:bold;">Ready</div>
-            <div style="font-size:18px; color:gray;">Set your options, then press Start.</div>
+        <div style="text-align:center; padding:20px; border:2px solid #e5e7eb; border-radius:18px;">
+            <div style="font-size:62px;">🏸</div>
+            <div style="font-size:34px; font-weight:800;">Ready</div>
+            <div style="font-size:17px; color:#6b7280;">Set your options, then press Start.</div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
     rep_text.subheader(f"✅ Reps: {st.session_state.rep_count}")
 
 # -----------------------------
-# Session summary
+# Summary
 # -----------------------------
 st.markdown("---")
 st.subheader("Session summary")
