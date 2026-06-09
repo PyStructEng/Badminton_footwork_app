@@ -1033,3 +1033,63 @@ else:
     st.subheader("Zone map")
     for zone, label in ZONES.items():
         st.write(f"**{zone}** = {label}")
+
+
+# ==========================================
+# Feedback & Support Section
+# ==========================================
+
+st.markdown("---")
+
+st.subheader("🏸 Feedback")
+
+feedback = st.text_area(
+    "Feature requests or feedback",
+    placeholder="What would make this app more useful for your badminton training?"
+)
+
+if st.button("Submit Feedback"):
+    if feedback.strip():
+        with open("feedback.txt", "a", encoding="utf-8") as f:
+            f.write(
+                f"\n{'='*60}\n"
+                f"Date: {datetime.now()}\n"
+                f"{feedback}\n"
+            )
+        st.success("Thank you for your feedback!")
+    else:
+        st.warning("Please enter some feedback first.")
+
+st.markdown("")
+
+st.markdown(
+    """
+    <div style="text-align:center; margin-top:30px; margin-bottom:20px;">
+        <h3>☕ Enjoying the app?</h3>
+        <p>
+            If this footwork trainer helps your badminton training and you'd like
+            to support future development, you can buy me a coffee.
+        </p>
+
+        <a href="https://buymeacoffee.com/armans01"
+           target="_blank">
+            <button style="
+                background-color:#FFDD00;
+                color:black;
+                border:none;
+                padding:14px 28px;
+                border-radius:10px;
+                font-size:18px;
+                font-weight:bold;
+                cursor:pointer;">
+                ☕ Buy Me a Coffee
+            </button>
+        </a>
+
+        <p style="margin-top:20px; color:gray;">
+            Created by Arman Chowdhury
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
