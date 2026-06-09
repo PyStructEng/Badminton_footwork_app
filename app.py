@@ -1062,34 +1062,18 @@ if st.button("Submit Feedback"):
 
 st.markdown("")
 
-st.markdown(
-    """
-    <div style="text-align:center; margin-top:30px; margin-bottom:20px;">
-        <h3>☕ Enjoying the app?</h3>
-        <p>
-            If this footwork trainer helps your badminton training and you'd like
-            to support future development, you can buy me a coffee.
-        </p>
+st.markdown("### ☕ Enjoying the app?")
 
-        <a href="https://buymeacoffee.com/armans01"
-           target="_blank">
-            <button style="
-                background-color:#FFDD00;
-                color:black;
-                border:none;
-                padding:14px 28px;
-                border-radius:10px;
-                font-size:18px;
-                font-weight:bold;
-                cursor:pointer;">
-                ☕ Buy Me a Coffee
-            </button>
-        </a>
+st.write(
+    "If this footwork trainer helps your badminton training and you'd like "
+    "to support future development, you can buy me a coffee."
+)
 
-        <p style="margin-top:20px; color:gray;">
-            Created by Arman Chowdhury
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True
+st.link_button(
+    "☕ Buy Me a Coffee",
+    "https://buymeacoffee.com/armans01",
+    use_container_width=True
+)
+
+st.caption("Created by Arman Chowdhury")
 )
