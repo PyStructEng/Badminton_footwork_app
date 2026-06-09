@@ -10,7 +10,7 @@ st.set_page_config(
     page_title="Badminton Footwork Drill",
     page_icon="🏸",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -132,6 +132,42 @@ div[data-testid="stButton"] > button:hover {
     margin: 0;
     line-height: 1.85;
 }
+
+/* Mobile-first Streamlit shell tweaks */
+.block-container {
+    padding-top: 0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    max-width: 1250px;
+}
+.mobile-title {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 950;
+    line-height: 1.15;
+    margin: 4px 0 8px 0;
+}
+@media (max-width: 768px) {
+    .block-container {
+        padding-top: 0.25rem;
+        padding-left: 0.35rem;
+        padding-right: 0.35rem;
+    }
+    div[data-testid="stButton"] > button {
+        min-height: 44px;
+        font-size: 14px;
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+    .mobile-title {
+        font-size: 23px;
+        margin-bottom: 6px;
+    }
+    div[data-testid="stHorizontalBlock"] {
+        gap: 0.35rem;
+    }
+}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -520,6 +556,63 @@ body {{
     font-size: 16px;
 }}
 
+
+@media (max-width: 768px) {{
+    .shell {{ border-radius: 10px; }}
+    .top-panel {{
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 10px;
+    }}
+    .call-card {{
+        min-height: 130px;
+        padding: 14px 14px 12px;
+    }}
+    .status-title {{ font-size: 15px; margin-bottom: 7px; }}
+    .big-number {{ font-size: clamp(42px, 16vw, 66px); }}
+    .progress-track {{ margin: 12px 0 7px; }}
+    .next-call {{ font-size: 14px; }}
+    .stats-grid {{
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        background: rgba(8,17,27,0.35);
+        border-radius: 10px;
+        padding: 10px;
+    }}
+    .stat {{ grid-template-columns: 30px 1fr; }}
+    .stat-icon {{ font-size: 23px; }}
+    .stat-label {{ font-size: 10px; }}
+    .stat-value {{ font-size: 16px; }}
+    .court-section {{ padding: 10px 8px 14px; }}
+    .court-heading {{ font-size: 17px; margin-bottom: 4px; }}
+    .court-subheading {{ font-size: 13px; margin-bottom: 4px; }}
+    .court {{
+        height: min(72vh, 500px);
+        min-height: 410px;
+        clip-path: polygon(4% 0%, 96% 0%, 100% 100%, 0% 100%);
+        transform: none;
+    }}
+    .top-line {{ left: 6%; width: 88%; }}
+    .bottom-line {{ left: 3%; width: 94%; }}
+    .left-line {{ left: 6%; }}
+    .right-line {{ right: 6%; }}
+    .front-service {{ left: 5%; width: 90%; }}
+    .rear-service {{ left: 4%; width: 92%; }}
+    .zone-badge {{ width: 41px; height: 41px; font-size: 22px; }}
+    .zone-label {{ font-size: 11px; }}
+    .base {{ font-size: 16px; }}
+    .feet {{ font-size: 25px; }}
+    .back-label {{ font-size: 14px; }}
+    .tip-box {{ font-size: 13px; padding: 10px; margin-top: 8px; }}
+    .bottom-quote {{ font-size: 13px; }}
+}}
+@media (max-width: 430px) {{
+    .court {{ height: 405px; min-height: 405px; }}
+    .zone-badge {{ width: 38px; height: 38px; font-size: 20px; }}
+    .zone-label {{ font-size: 10.5px; }}
+    .tip-box {{ display: none; }}
+}}
+
 @media (max-width: 900px) {{
     .top-panel {{ grid-template-columns: 1fr; }}
     .court {{ height: 350px; }}
@@ -667,6 +760,7 @@ with st.sidebar:
 # --------------------------
 # Navigation and controls
 # --------------------------
+st.markdown('<div class="mobile-title">Badminton Footwork Drill 🏸</div>', unsafe_allow_html=True)
 nav_left, nav_mid, nav_right = st.columns([1, 2, 1])
 with nav_mid:
     n1, n2, n3 = st.columns(3)
@@ -703,7 +797,7 @@ if st.session_state.page == "Drill":
 
     components.html(
         dashboard_html(phase_label, main_call, next_text, progress_pct, total_rounds),
-        height=850,
+        height=760,
         scrolling=False,
     )
 
