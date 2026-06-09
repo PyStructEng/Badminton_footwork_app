@@ -1,3 +1,4 @@
+
 import random
 import time
 from datetime import datetime
@@ -26,6 +27,15 @@ ZONES = {
     6: "Rear Right",
 }
 
+ZONE_GROUP = {
+    1: "front",
+    2: "front",
+    3: "mid",
+    4: "mid",
+    5: "rear",
+    6: "rear",
+}
+
 DRILL_MODES = {
     "6 Corner Random": [1, 2, 3, 4, 5, 6],
     "Front Court": [1, 2],
@@ -51,6 +61,7 @@ DEFAULTS = {
     "last_saved_signature": None,
     "current_interval": None,
     "tempo_label": "Normal",
+    "shot_context": "",
     "burst_remaining": 0,
     "recover_next": False,
 }
@@ -317,6 +328,7 @@ def reset_drill():
     st.session_state.last_saved_signature = None
     st.session_state.current_interval = None
     st.session_state.tempo_label = "Normal"
+    st.session_state.shot_context = ""
     st.session_state.burst_remaining = 0
     st.session_state.recover_next = False
 
@@ -336,12 +348,57 @@ def stop_drill(drill_mode, call_type):
     st.session_state.phase = "finished"
 
 
-def call_text(zone: int, call_type: str):
+def simple_call_text(zone: int, call_type: str):
     if call_type == "Number only":
         return str(zone)
     if call_type == "Direction only":
         return ZONES[zone]
     return f"{zone} - {ZONES[zone]}"
+
+
+def choose_shot_context(zone: int, tempo_label: str):
+    """
+    Chooses an imagined shot/recovery context based on the called zone and tempo.
+    This makes the command more badminton-specific than just saying "Fast 6".
+    """
+    group = ZONE_GROUP[zone]
+
+    if tempo_label == "Recover":
+        return "base reset"
+
+    if group == "front":
+        if tempo_label == "Fast":
+            return random.choice(["net recover", "net kill recover", "lift recover"])
+        return random.choice(["net shot recover", "lift reset", "controlled lunge"])
+
+    if group == "mid":
+        if tempo_label == "Fast":
+            return random.choice(["drive ready", "block recover", "flat exchange"])
+        return random.choice(["block reset", "drive ready", "defense recover"])
+
+    if group == "rear":
+        if tempo_label == "Fast":
+            return random.choice(["smash recover", "fast drop recover", "attack recover"])
+        return random.choice(["clear reset", "drop hold", "overhead recover"])
+
+    return ""
+
+
+def command_text(zone: int, call_type: str, command_detail: str, tempo_label: str, shot_context: str):
+    base = simple_call_text(zone, call_type)
+
+    if command_detail == "Simple":
+        return base
+
+    if command_detail == "Tempo + Number":
+        if tempo_label in ["Fast", "Recover", "Normal"]:
+            return f"{tempo_label}. {base}"
+        return base
+
+    # Shot Context mode
+    if tempo_label in ["Fast", "Recover", "Normal"]:
+        return f"{tempo_label}. {base}. {shot_context}"
+    return f"{base}. {shot_context}"
 
 
 def get_next_interval(
@@ -353,25 +410,13 @@ def get_next_interval(
     fast_max_interval,
     recovery_interval,
 ):
-    """
-    Controls the timing between calls.
-
-    Fixed:
-        Same timing every call.
-
-    Random Jitter:
-        Random timing between Normal Min and Normal Max.
-
-    Match Simulation:
-        Mostly normal calls, with occasional fast rally bursts and recovery calls.
-    """
     if timing_style == "Fixed":
         return float(interval), "Normal"
 
     if timing_style == "Random Jitter":
         return float(random.uniform(random_min_interval, random_max_interval)), "Random"
 
-    # Match Simulation mode
+    # Match Simulation
     if st.session_state.recover_next:
         st.session_state.recover_next = False
         return float(recovery_interval), "Recover"
@@ -382,7 +427,6 @@ def get_next_interval(
             st.session_state.recover_next = True
         return float(random.uniform(fast_min_interval, fast_max_interval)), "Fast"
 
-    # Start a sudden fast rally burst sometimes
     if random.random() < 0.25:
         st.session_state.burst_remaining = random.randint(2, 4)
         st.session_state.burst_remaining -= 1
@@ -406,7 +450,7 @@ def tick(
     fast_min_interval,
     fast_max_interval,
     recovery_interval,
-    voice_tempo_cues,
+    command_detail,
 ):
     if not st.session_state.running:
         return
@@ -428,13 +472,6 @@ def tick(
 
         if st.session_state.round == 0 or now - st.session_state.next_call_start >= active_interval:
             zone = random.choice(active_zones)
-            st.session_state.current_zone = zone
-            st.session_state.round += 1
-            st.session_state.completed += 1
-            st.session_state.streak += 1
-            st.session_state.best_streak = max(st.session_state.best_streak, st.session_state.streak)
-            st.session_state.history.append(zone)
-
             next_interval, tempo_label = get_next_interval(
                 timing_style,
                 interval,
@@ -444,23 +481,21 @@ def tick(
                 fast_max_interval,
                 recovery_interval,
             )
+            shot_context = choose_shot_context(zone, tempo_label)
 
+            st.session_state.current_zone = zone
+            st.session_state.round += 1
+            st.session_state.completed += 1
+            st.session_state.streak += 1
+            st.session_state.best_streak = max(st.session_state.best_streak, st.session_state.streak)
+            st.session_state.history.append(zone)
             st.session_state.current_interval = next_interval
             st.session_state.tempo_label = tempo_label
+            st.session_state.shot_context = shot_context
             st.session_state.next_call_start = now
 
             if voice_on:
-                spoken_call = call_text(zone, call_type)
-
-                if voice_tempo_cues:
-                    if tempo_label == "Fast":
-                        spoken_call = f"Fast. {spoken_call}"
-                    elif tempo_label == "Recover":
-                        spoken_call = f"Recover. {spoken_call}"
-                    elif tempo_label == "Normal":
-                        spoken_call = f"Normal. {spoken_call}"
-
-                speak(spoken_call)
+                speak(command_text(zone, call_type, command_detail, tempo_label, shot_context))
 
             if rest_time > 0:
                 st.session_state.phase = "rest"
@@ -472,7 +507,7 @@ def tick(
             st.session_state.next_call_start = now
 
 
-def card_values(interval, prepare_time, rest_time, call_type):
+def card_values(interval, prepare_time, rest_time, call_type, command_detail):
     now = time.time()
 
     if st.session_state.phase == "idle":
@@ -498,7 +533,15 @@ def card_values(interval, prepare_time, rest_time, call_type):
         else:
             label = "GO"
 
-        return label, call_text(st.session_state.current_zone, call_type), f"Next in {remaining:.1f}s", pct
+        zone = st.session_state.current_zone
+        base = simple_call_text(zone, call_type)
+
+        if command_detail == "Shot Context" and st.session_state.shot_context:
+            main_call = f"{base} — {st.session_state.shot_context}"
+        else:
+            main_call = base
+
+        return label, main_call, f"Next in {remaining:.1f}s", pct
 
     if st.session_state.phase == "rest":
         remaining = max(0, rest_time - (now - st.session_state.phase_start))
@@ -578,9 +621,9 @@ html, body {{
 }}
 
 .big-number {{
-    font-size: clamp(44px, 8vw, 74px);
+    font-size: clamp(34px, 6vw, 70px);
     font-weight: 950;
-    line-height: 1;
+    line-height: 1.08;
     color: white;
     text-shadow: 0 4px 18px rgba(0,0,0,0.35);
     word-break: break-word;
@@ -639,7 +682,6 @@ html, body {{
 .blue {{ color: #38a3ff; }}
 .purple {{ color: #bf5af2; }}
 .orange {{ color: #ff9f0a; }}
-.yellow-text {{ color: #ffd60a; }}
 
 .court-section {{
     padding: 18px 24px 24px;
@@ -801,7 +843,7 @@ html, body {{
     }}
 
     .big-number {{
-        font-size: clamp(42px, 16vw, 66px);
+        font-size: clamp(30px, 13vw, 58px);
     }}
 
     .progress-track {{ margin: 12px 0 7px; }}
@@ -950,7 +992,7 @@ html, body {{
             <div class="back-label">BASE / BACK COURT</div>
         </div>
 
-        <div class="tip-box">ⓘ &nbsp; Move to the called zone fast, recover to BASE, then get ready for the next call.</div>
+        <div class="tip-box">ⓘ &nbsp; Listen to the tempo and shot context. Move to the zone, imagine the shot, then recover appropriately.</div>
     </div>
 </div>
 <div class="bottom-quote">Stay light. Move fast. Be consistent. 💪</div>
@@ -972,6 +1014,14 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
+    st.markdown('<div class="control-label">COMMAND DETAIL</div>', unsafe_allow_html=True)
+    command_detail = st.selectbox(
+        "Command Detail",
+        ["Simple", "Tempo + Number", "Shot Context"],
+        index=2,
+        label_visibility="collapsed",
+    )
+
     c1, c2 = st.columns(2)
     with c1:
         st.markdown('<div class="control-label">INTERVAL</div>', unsafe_allow_html=True)
@@ -984,34 +1034,18 @@ with st.sidebar:
     timing_style = st.selectbox(
         "Timing Style",
         ["Fixed", "Random Jitter", "Match Simulation"],
-        index=1,
+        index=2,
         label_visibility="collapsed",
     )
-
-    voice_tempo_cues = st.checkbox("Voice tempo cues: Normal / Fast / Recover", value=True)
 
     if timing_style in ["Random Jitter", "Match Simulation"]:
         j1, j2 = st.columns(2)
         with j1:
             st.markdown('<div class="control-label">NORMAL MIN</div>', unsafe_allow_html=True)
-            random_min_interval = st.number_input(
-                "Normal Min",
-                min_value=0.5,
-                max_value=10.0,
-                value=2.0,
-                step=0.5,
-                label_visibility="collapsed",
-            )
+            random_min_interval = st.number_input("Normal Min", min_value=0.5, max_value=10.0, value=2.0, step=0.5, label_visibility="collapsed")
         with j2:
             st.markdown('<div class="control-label">NORMAL MAX</div>', unsafe_allow_html=True)
-            random_max_interval = st.number_input(
-                "Normal Max",
-                min_value=0.5,
-                max_value=10.0,
-                value=4.0,
-                step=0.5,
-                label_visibility="collapsed",
-            )
+            random_max_interval = st.number_input("Normal Max", min_value=0.5, max_value=10.0, value=4.0, step=0.5, label_visibility="collapsed")
     else:
         random_min_interval = interval
         random_max_interval = interval
@@ -1020,34 +1054,13 @@ with st.sidebar:
         f1, f2 = st.columns(2)
         with f1:
             st.markdown('<div class="control-label">FAST MIN</div>', unsafe_allow_html=True)
-            fast_min_interval = st.number_input(
-                "Fast Min",
-                min_value=0.3,
-                max_value=5.0,
-                value=0.8,
-                step=0.1,
-                label_visibility="collapsed",
-            )
+            fast_min_interval = st.number_input("Fast Min", min_value=0.3, max_value=5.0, value=0.8, step=0.1, label_visibility="collapsed")
         with f2:
             st.markdown('<div class="control-label">FAST MAX</div>', unsafe_allow_html=True)
-            fast_max_interval = st.number_input(
-                "Fast Max",
-                min_value=0.3,
-                max_value=5.0,
-                value=1.5,
-                step=0.1,
-                label_visibility="collapsed",
-            )
+            fast_max_interval = st.number_input("Fast Max", min_value=0.3, max_value=5.0, value=1.5, step=0.1, label_visibility="collapsed")
 
         st.markdown('<div class="control-label">RECOVERY TIME</div>', unsafe_allow_html=True)
-        recovery_interval = st.number_input(
-            "Recovery Time",
-            min_value=1.0,
-            max_value=8.0,
-            value=4.0,
-            step=0.5,
-            label_visibility="collapsed",
-        )
+        recovery_interval = st.number_input("Recovery Time", min_value=1.0, max_value=8.0, value=4.0, step=0.5, label_visibility="collapsed")
     else:
         fast_min_interval = 0.8
         fast_max_interval = 1.5
@@ -1077,8 +1090,8 @@ with st.sidebar:
     <h3>HOW TO USE</h3>
     <ol>
         <li>Start the drill</li>
-        <li>Move to the called zone</li>
-        <li>Recover back to base</li>
+        <li>Listen to the zone and shot context</li>
+        <li>Move, imagine the shot, then recover</li>
         <li>React to normal, fast, and recovery tempo changes</li>
     </ol>
 </div>
@@ -1116,9 +1129,9 @@ if st.session_state.page == "Drill":
         fast_min_interval,
         fast_max_interval,
         recovery_interval,
-        voice_tempo_cues,
+        command_detail,
     )
-    phase_label, main_call, next_text, progress_pct = card_values(interval, prepare_time, rest_time, call_type)
+    phase_label, main_call, next_text, progress_pct = card_values(interval, prepare_time, rest_time, call_type, command_detail)
 
     b1, b2 = st.columns(2)
     with b1:
@@ -1237,6 +1250,11 @@ else:
         - Fixed: same interval every time.
         - Random Jitter: random time between each call.
         - Match Simulation: normal timing with sudden fast rally bursts and recovery calls.
+
+        Command detail:
+        - Simple: just the number or direction.
+        - Tempo + Number: adds Normal, Fast, or Recover.
+        - Shot Context: adds a badminton-specific imagined shot and recovery cue.
         """
     )
 
